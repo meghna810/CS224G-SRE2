@@ -32,3 +32,6 @@ list_models.py
 
 # Logs
 *.log
+
+# Large dataset files (OpenRCA Bank telemetry — re-download from source)
+Bank/telemetry/

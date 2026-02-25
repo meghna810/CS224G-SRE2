@@ -1,0 +1,4 @@
+# Core eval dependencies (in addition to existing RootScout requirements)
+pandas>=2.0
+sentence-transformers>=2.7  # semantic similarity scoring for reason field
+numpy>=1.24

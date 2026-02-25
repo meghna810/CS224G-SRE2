@@ -1,0 +1,4 @@
+scenario_id,task_index,difficulty,title,prediction,score,passing,failing,error
+bank_001,task_1,medium,[Bank] IG02 — high CPU usage,"{""root cause occurrence datetime"": ""2021-03-09 18:08:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}",1.0,['time:2021-03-09 18:08:00'],[],
+bank_002,task_2,medium,[Bank] Redis02 — high CPU usage,"{""root cause occurrence datetime"": ""2021-03-04 07:01:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}",0.0,[],['reason:high CPU usage'],
+bank_003,task_3,medium,[Bank] Tomcat01 — high CPU usage,"{""root cause occurrence datetime"": ""2021-03-10 04:38:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}",0.0,[],['component:Tomcat01'],

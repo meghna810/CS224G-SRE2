@@ -32,6 +32,7 @@ from graph.graph_builder import GraphBuilder
 from graph.context_retriever import ContextRetriever
 from graph.agent import RCAAgent
 from llm_integration.client import MockClient, GeminiClient
+from slack_integration import SlackNotifier
 
 
 # =============================================================================
@@ -539,6 +540,18 @@ def main():
 
     print("\n🔍 Analyzing... (sending context to LLM)")
     analysis = agent.analyze(context)
+
+    # =========================================================================
+    # Send to Slack (if configured)
+    # =========================================================================
+    print("\n📤 Sending RCA analysis to Slack...")
+    slack_notifier = SlackNotifier()
+    slack_notifier.send_rca_analysis(
+        analysis=analysis,
+        incident_title="Checkout Failures Detected (Demo)",
+        focus_service=failing_service,
+        alert_severity="warning"
+    )
 
     pause()
 

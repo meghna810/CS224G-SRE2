@@ -1,0 +1,10 @@
+query,answer,groundtruth,passed,failed,score,task_index
+The cart-service repeatedly fails to acquire a DB connection because the connection pool is fully saturated. frontend and auth-service are healthy.,"{""root cause occurrence datetime"": ""2024-06-01 10:00:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}","The only predicted root cause component is cart-service
+The only predicted root cause reason is database connection pool exhausted
+The only root cause occurrence time is within 1 minutes (i.e., <=1min) of 2024-06-01 10:00:00",['time:2024-06-01 10:00:00'],"['component:cart-service', 'reason:database connection pool exhausted']",0.3333,task_1
+The payment-service process crashes with OOM. All payment calls fail immediately. Other services are healthy.,"{""root cause occurrence datetime"": ""2024-06-01 10:00:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}","The only predicted root cause component is payment-service
+The only predicted root cause reason is out-of-memory crash
+The only root cause occurrence time is within 1 minutes (i.e., <=1min) of 2024-06-01 10:00:00",['time:2024-06-01 10:00:00'],"['component:payment-service', 'reason:out-of-memory crash']",0.3333,task_2
+The notification-service was deployed with a rotated API key that was never updated in the config. Every outbound call returns 401. All other services are unaffected.,"{""root cause occurrence datetime"": ""2024-06-01 10:00:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}","The only predicted root cause component is notification-service
+The only predicted root cause reason is invalid API key in configuration
+The only root cause occurrence time is within 1 minutes (i.e., <=1min) of 2024-06-01 10:00:00",['time:2024-06-01 10:00:00'],"['component:notification-service', 'reason:invalid API key in configuration']",0.3333,task_3

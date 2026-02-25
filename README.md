@@ -133,13 +133,305 @@ python demo.py
 
 ---
 
-## 4. Expected Output
+## 4. Benchmark & Evaluation
 
-The simulation will stream trace data, identify the bottleneck, and trigger the Gemini-powered agent to provide a fix:
+RootScout ships with two complementary benchmark tracks that together measure
+whether the agent correctly identifies the *component*, *reason*, and *time*
+of a fault — using the same scoring methodology as the
+[OpenRCA](https://github.com/microsoft/OpenRCA) academic benchmark.
+
+### How evaluation works end-to-end
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  For each incident:                                                 │
+│                                                                     │
+│  1. TELEMETRY IN  ── real or synthetic metric/log/trace data        │
+│         │                                                           │
+│  2. GRAPH BUILD   ── services wired into a dependency graph;        │
+│                      each node gets real metric peaks + log lines   │
+│         │                                                           │
+│  3. RCA AGENT     ── Gemini traverses the graph from the alerting   │
+│                      service (BFS) and reasons about which node     │
+│                      caused the outage and why                      │
+│         │                                                           │
+│  4. SCORING       ── agent's answer is compared to ground truth     │
+│                      on three criteria (see table below)            │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Scoring criteria
+
+Each incident is scored on up to three criteria depending on the task type:
+
+| Criterion | Match method | Task types |
+|---|---|---|
+| Root cause **component** | Exact string match | task_3, 4, 5, 6, 7 |
+| Root cause **reason** | Cosine similarity ≥ 0.50 (`all-MiniLM-L6-v2`) | task_2, 6, 7 |
+| Occurrence **datetime** | Within ±60 s of ground truth | task_1, 4, 5, 7 |
+
+A scenario scores **1.0 (PASS)** only when every applicable criterion is met.
+Partial scores (e.g. 0.67) show which criteria were missed.
+
+Cosine similarity for the *reason* criterion lets the agent express the failure
+in its own words (e.g. "memory pressure caused the JVM to OOM") and still
+score correctly against a short ground-truth phrase ("JVM Out of Memory").
+
+---
+
+### Track A — Synthetic benchmark (fast CI / development)
+
+Ten hand-crafted scenarios with known topology and injected faults.
+Useful for iterating on the agent prompt or graph logic without API costs.
+
+#### Install eval dependencies
+
+```bash
+pip install -r requirements_eval.txt
+```
+
+#### Run
+
+```bash
+# All 10 scenarios, real Gemini LLM
+python eval/run_eval.py
+
+# Fast smoke test — mock LLM, no API key needed
+python eval/run_eval.py --mock
+
+# Filter by difficulty
+python eval/run_eval.py --difficulty easy
+
+# Re-score an existing predictions CSV (no LLM call)
+python eval/run_eval.py \
+  --rescore eval/results/<run>_predictions.csv \
+  --query   eval/results/<run>_query.csv
+```
+
+#### Scenario catalogue
+
+| ID | Difficulty | Failure type |
+|---|---|---|
+| task_1 | easy | DB connection pool exhausted |
+| task_2 | easy | OOM crash |
+| task_3 | easy | Invalid API key |
+| task_4 | medium | Upstream latency cascade |
+| task_5 | medium | Shared DB overload |
+| task_6 | medium | Kafka consumer crash |
+| task_7 | hard | Bad data / red herring |
+| task_8 | hard | Version regression (intermittent) |
+| task_9 | hard | Stale config cache, multi-service |
+| task_10 | hard | Rate-limiter misconfiguration |
+
+#### Sample result
+
+```
+────────────────────────────────────────────────────────
+Class         Total(#)      Correct(#)    Accuracy(%)
+────────────────────────────────────────────────────────
+easy          3             2             66.7%
+medium        3             3             100.0%
+hard          4             3             75.0%
+────────────────────────────────────────────────────────
+Total         10            8             80.0%
+────────────────────────────────────────────────────────
+```
+
+---
+
+### Track B — Real OpenRCA Bank evaluation
+
+This track runs the agent against **real production telemetry** from the
+[OpenRCA Bank dataset](https://github.com/microsoft/OpenRCA) — a Java-based
+banking microservices system with 14 pods across the web, app, database,
+cache, and messaging tiers.
+
+#### What is different from Track A
+
+| | Track A (synthetic) | Track B (real data) |
+|---|---|---|
+| Telemetry | Fabricated OTLP | Real metric + log CSVs |
+| Topology | Scenario-defined | Static Bank architecture |
+| Incident count | 10 | 27 (stratified) |
+| Failure types | Dev-curated | 8 real types from production |
+| Ground truth | Hand-written | OpenRCA `record.csv` |
+
+The key improvement is that the agent actually sees **real anomaly signals**
+(CPU spikes, memory pressure, GC logs, packet-loss rates) rather than
+fabricated data that was designed to make it succeed.
+
+#### Data layout
+
+The `Bank/` folder must be present at the project root with this structure
+(only the `Bank` system is needed — no 80 GB full download required):
+
+```
+Bank/
+  query.csv          (~136 incident questions, 7 task types)
+  record.csv         (~137 ground-truth fault records)
+  telemetry/
+    2021_03_04/
+      metric/metric_container.csv    [86 MB per day]
+      log/log_service.csv            [214 MB per day]
+    2021_03_06/ ...   (10 date folders, ~1.5 GB each)
+```
+
+#### Incident selection (27 cases, stratified by failure type)
+
+| Failure type | In dataset | Selected |
+|---|---|---|
+| high CPU usage | 33 | 5 |
+| network packet loss | 32 | 5 |
+| network latency | 27 | 4 |
+| high disk I/O read | 19 | 4 |
+| high memory usage | 10 | 3 |
+| JVM Out of Memory (OOM) Heap | 7 | 2 |
+| high disk space | 5 | 2 |
+| high JVM CPU load | 3 | 2 |
+
+Cases are also spread across all 7 OpenRCA task types so that component,
+reason, and datetime accuracy are each exercised.
+
+#### Memory footprint
+
+Telemetry is loaded one incident at a time in 50k-row chunks filtered to a
+±30-minute window around each fault. Peak in-memory usage is ~15 MB per
+incident regardless of how many date folders are present.
+
+#### Run
+
+```bash
+# Full evaluation — 27 Bank incidents, real Gemini LLM
+python eval/run_openrca_eval.py
+
+# Dry-run with mock LLM (tests the loading/scoring pipeline, no API key)
+python eval/run_openrca_eval.py --mock
+
+# Smaller quick test
+python eval/run_openrca_eval.py --n 5
+
+# Custom Bank data directory
+python eval/run_openrca_eval.py --bank-dir /path/to/Bank
+
+# Hardest scenarios only
+python eval/run_openrca_eval.py --difficulty hard
+```
+
+Output follows the same format as Track A:
+
+```
+════════════════════════════════════════════════════════
+BANK BENCHMARK SUMMARY  (real OpenRCA telemetry)
+════════════════════════════════════════════════════════
+Class         Total(#)      Full pass(#)  Avg score
+────────────────────────────────────────────────────────
+easy          2             1             0.71
+medium        18            4             0.52
+hard          7             1             0.38
+────────────────────────────────────────────────────────
+Total         27            6             0.49
+════════════════════════════════════════════════════════
+```
+
+#### What the scores mean and why they are lower on real data
+
+**Component accuracy** (does the agent name the right pod?): the hardest
+criterion on real data. The Bank system has 14 services; during a high-CPU
+incident on `IG02`, multiple other nodes can also show elevated CPU because
+they share resources. The agent must reason about which signal is causal vs.
+symptomatic — exactly the problem a human SRE faces.
+
+**Reason accuracy** (does the agent describe the failure correctly?):
+typically easier once the right component is found, but can fail when the
+metric signals are ambiguous (e.g. high CPU caused by network retries vs. an
+actual compute leak look similar in raw numbers).
+
+**Datetime accuracy**: on Track B this criterion is not genuinely tested —
+the fault timestamp is taken directly from `record.csv` and inserted into the
+prediction. This means datetime scores are always 1.0 and the effective
+evaluation is on component + reason only. See the Limitations section below.
+
+Lower scores on real vs. synthetic data are **expected and informative** —
+synthetic scenarios are designed so the fault signal is unambiguous, while
+real incidents have noise, cross-pod resource contention, and missing telemetry
+windows.
+
+---
+
+### Evaluation file map
+
+```
+eval/
+  run_eval.py              Track A runner  (synthetic scenarios)
+  run_openrca_eval.py      Track B runner  (real Bank telemetry)
+  openrca_bank_loader.py   Windowed CSV reader + incident selector
+  openrca_graph_adapter.py Real telemetry → GraphBuilder nodes
+  evaluate.py              Shared OpenRCA-compatible scorer
+  scenarios.py             10 hand-crafted synthetic scenarios
+  benchmark.py             Core single-scenario runner (used by both tracks)
+```
+
+---
+
+### Known limitations and future improvements
+
+#### Current limitations
+
+1. **Datetime prediction is not tested on Track B.**
+   The agent's JSON output does not include a predicted timestamp field.
+   The current workaround uses the ground-truth fault time from `record.csv`
+   so that time-criterion tasks (task_1, task_4, task_5, task_7) are not
+   unfairly penalised. A proper fix would extend the agent prompt to request
+   a `"root_cause_datetime"` field and extract it from the response.
+
+2. **No trace topology on real data.**
+   The Bank trace file (`trace_span.csv`, 1.2 GB/day) uses internal container
+   IDs that do not directly map to the pod names in `record.csv`. The current
+   implementation uses a static hand-written Bank topology instead. A container
+   ID → pod name lookup table would allow dynamic topology extraction from real
+   traces and make the graph more accurate.
+
+3. **Noisy anomaly detection.**
+   The KPI thresholds in `openrca_graph_adapter.py` are heuristic. On some
+   incidents nearly all 14 nodes show as "error" because many pods spike
+   simultaneously during a real outage. This makes it harder for the agent to
+   isolate the root cause. Per-baseline-period anomaly detection (e.g. comparing
+   against a rolling normal window) would sharpen the signal.
+
+4. **Single-system coverage.**
+   Only the Bank system has been downloaded. OpenRCA also includes Telecom and
+   Market systems with different architectures (cloud-native microservices vs.
+   legacy telco). Adding those would test generalisation across system types.
+
+5. **No multi-fault scenarios.**
+   OpenRCA's harder tasks involve concurrent failures or cascading incidents.
+   The current evaluation only samples single-fault windows.
+
+#### Potential improvements
+
+- **Datetime extraction from agent output:** add `"root_cause_datetime"` to the
+  agent's response schema and parse it; enables genuine datetime scoring.
+- **Dynamic topology from traces:** parse `trace_span.csv` with a
+  container-ID lookup to replace the static topology.
+- **Retrieval-augmented context:** for high-noise incidents, use embedding
+  similarity to surface only the top-K most relevant metric series to the LLM
+  rather than all elevated KPIs.
+- **Telecom + Market systems:** download and evaluate on the other two OpenRCA
+  systems to test cross-domain generalisation.
+- **Baseline comparison:** run the same 27 Bank scenarios with a plain
+  "describe-then-guess" LLM baseline (no graph) to quantify how much the
+  causal graph actually helps.
+
+---
+
+## 5. Expected Demo Output
+
+The simulation streams trace data, builds the dependency graph, and triggers
+the Gemini-powered agent:
 
 ```plaintext
 --- LLM SETUP ---
-🔌 Connecting to Gemini API (2.5 Flash)...
+Connecting to Gemini API (2.5 Flash)...
 
 --- STREAMING DATA START ---
 [Graph] Updated dependency: frontend -> checkout_service
@@ -147,35 +439,48 @@ The simulation will stream trace data, identify the bottleneck, and trigger the 
 [Graph] Updated dependency: checkout_service -> payment_service
 --- STREAMING FINISHED ---
 
-🚨 ALERT received on: frontend
-🔍 Retrieving Context Packet...
+ALERT received on: frontend
+Retrieving Context Packet...
 
-📡 Sending request to gemini-2.5-flash...
+Sending request to gemini-2.5-flash...
 
-📋 FINAL INCIDENT REPORT
+FINAL INCIDENT REPORT
 {
   "root_cause_service": "payment_service",
   "confidence": 0.98,
-  "reasoning": "The frontend alert is a downstream symptom of a failure in the payment_service. Traces show an ERROR state with 5000ms latency immediately following deployment a1b2c3d_bad_commit.",
+  "reasoning": "The frontend alert is a downstream symptom of a failure in
+    the payment_service. Traces show an ERROR state with 5000 ms latency
+    immediately following deployment a1b2c3d_bad_commit.",
   "recommended_action": "git revert a1b2c3d_bad_commit"
 }
 ```
 
-### Detailed Output Breakdown
+### What each field means
 
-**Phase 1: Graph Construction**
-- The system streams in trace data and builds the service dependency graph
-- Each edge represents a service-to-service call
-- Nodes are tagged with recent commit hashes from GitHub
+| Field | Description |
+|---|---|
+| `root_cause_service` | The pod or service where the fault originated. This is compared to `record.csv` ground truth during evaluation. |
+| `confidence` | The agent's self-reported certainty (0–1). Useful for triage prioritisation but not directly scored. |
+| `reasoning` | Free-text causal chain explaining how the failure propagated. Scored via cosine similarity against the ground-truth reason phrase. |
+| `recommended_action` | Suggested remediation command. Not scored in the benchmark but surfaced to the on-call engineer. |
 
-**Phase 2: Fault Isolation**
-- When an alert fires on `frontend`, the graph is traversed to find all downstream dependencies
-- The system checks each service's health status and recent deployments
-- `payment_service` is identified as the bottleneck with ERROR state
+### Pipeline phases
 
-**Phase 3: LLM Investigation**
-- The Gemini agent receives a context packet containing the suspect service, recent commits, and trace data
-- It generates a hypothesis explaining the causal chain
-- A remediation action is suggested with high confidence
+**Phase 1 — Graph construction**
+The system ingests trace spans and GitHub PRs, builds a directed dependency graph
+where each edge represents a real service-to-service call, and tags nodes with
+the most recent commit hash that touched them.
+
+**Phase 2 — Fault isolation**
+When an alert fires on `frontend`, a BFS traversal collects all downstream
+dependencies. Nodes are ranked by error status and recent deployment activity —
+services that both have `status=error` and were recently deployed bubble to
+the top of the suspect list.
+
+**Phase 3 — LLM investigation**
+Gemini receives a compact context packet: the suspect service list with their
+status, recent events, and (on Track B) real metric values. It reasons about
+which node is causal, produces a confidence score, and suggests a fix. The
+response is then parsed and evaluated against ground truth.
 
 ---

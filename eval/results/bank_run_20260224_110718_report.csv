@@ -1,0 +1,7 @@
+query,answer,groundtruth,passed,failed,score,task_index
+"During the specified time range of March 9, 2021, from 18:00 to 18:30, a failure was detected within the system. The exact time of the root cause occurrence is unknown, which complicates the diagnosis process. Please pinpoint the root cause occurrence datetime.","{""root cause occurrence datetime"": ""2021-03-09 18:08:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}","The only root cause occurrence time is within 1 minutes (i.e., <=1min) of 2021-03-09 18:08:00
+",['time:2021-03-09 18:08:00'],[],1.0,task_1
+"There was a single failure within the time range of March 4, 2021, from 07:00 to 07:30. The exact reason for this failure remains unknown. Please determine the root cause reason for this failure.","{""root cause occurrence datetime"": ""2021-03-04 07:01:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}","The only predicted root cause reason is high CPU usage
+",[],['reason:high CPU usage'],0.0,task_2
+"On March 10, 2021, between the time range of 04:30 to 05:00, the system experienced one failure. The specific component responsible for this failure is currently unknown. Your task is to identify the root cause component.","{""root cause occurrence datetime"": ""2021-03-10 04:38:00"", ""root cause component"": ""mock"", ""root cause reason"": """"}","The only predicted root cause component is Tomcat01
+",[],['component:Tomcat01'],0.0,task_3
