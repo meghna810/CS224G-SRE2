@@ -27,7 +27,7 @@ import os
 import sys
 import time
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -105,7 +105,7 @@ _DEMO_SERVICE   = "cartservice"
 _DEMO_FAULT     = "F1"
 _DEMO_CASE_NUM  = "1"
 _DEMO_CASE_DIR  = f"{_DEMO_SERVICE}_{_DEMO_FAULT}_{_DEMO_CASE_NUM}"
-_DATA_DIR       = "data/RE3/RE3-OB"
+_DATA_DIR       = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "RE3", "RE3-OB")
 
 
 def main():

@@ -2,22 +2,15 @@
 
 RootScout is an agentic system for automated root cause analysis (RCA) in distributed systems. It ingests telemetry (OTel traces, metrics, logs) and GitHub PR data, builds a causal dependency graph, and uses an LLM to identify which service caused an incident and why.
 
-## How it works
-
-1. **Graph construction** — Trace spans are ingested and wired into a directed dependency graph. Each node tracks health status and recent events.
-2. **Fault isolation** — When an alert fires, BFS traversal from the alerting service collects the subgraph of suspects.
-3. **LLM reasoning** — A Gemini (or Claude) agent receives the context packet and returns a structured root cause report.
-
 ---
 
-## Setup
-
-### Prerequisites
+## Prerequisites
 
 - Python 3.9+
 - Gemini API key from [Google AI Studio](https://aistudio.google.com/) and/or Anthropic API key
+- Set `SLACK_BOT_TOKEN=xoxb-...` in your `.env` file to post real Slack messages (optional — all demos work in dry-run mode without it)
 
-### Install
+## Install
 
 ```bash
 git clone https://github.com/asthamohta/CS224G-SRE.git
@@ -26,7 +19,7 @@ pip install -r requirements.txt
 pip install -r requirements_eval.txt
 ```
 
-### Configure
+## Configure
 
 ```bash
 cp .env.example .env
@@ -37,24 +30,15 @@ cp .env.example .env
 
 ## Evaluation
 
-Three evaluation tracks measure whether the agent correctly identifies the root cause component and reason, using [OpenRCA](https://github.com/microsoft/OpenRCA) scoring.
-
-### Scoring
-
-| Criterion | Match method |
-|---|---|
-| Root cause component | Exact string match |
-| Root cause reason | Cosine similarity >= 0.50 (all-MiniLM-L6-v2) |
-
----
+Three evaluation tracks test whether the agent correctly identifies the root cause component and reason. Scoring follows the [OpenRCA](https://github.com/microsoft/OpenRCA) protocol: exact string match on component, cosine similarity ≥ 0.50 (all-MiniLM-L6-v2) on reason.
 
 ### Eval 1 — Synthetic benchmark
 
-Ten hand-crafted scenarios with known topology and injected faults. Useful for rapid iteration without real telemetry.
+Ten hand-crafted scenarios with known topology and injected faults.
 
 ```bash
-python eval/run_eval.py              # all 10 scenarios (requires Gemini or Anthropic API key)
-python eval/run_eval.py --mock       # mock LLM, no API key needed
+python eval/run_eval.py              # all 10 scenarios
+python eval/run_eval.py --mock       # no API key needed
 python eval/run_eval.py --difficulty easy
 ```
 
@@ -62,9 +46,9 @@ python eval/run_eval.py --difficulty easy
 
 ### Eval 2 — OpenRCA (real Bank telemetry)
 
-27 incidents from the [OpenRCA Bank dataset](https://github.com/microsoft/OpenRCA) — a Java-based banking microservices system with 14 pods. Requires the `Bank/` dataset directory at the project root.
+27 incidents from the [OpenRCA Bank dataset](https://github.com/microsoft/OpenRCA) — a Java-based banking microservices system with 14 pods.
 
-**Data layout:**
+**Data setup:** Download the Bank dataset and place it at `Bank/` in the project root:
 
 ```
 Bank/
@@ -78,7 +62,7 @@ Bank/
 ```
 
 ```bash
-python eval/run_openrca_eval.py              # 27 Bank incidents (requires API key)
+python eval/run_openrca_eval.py              # 27 Bank incidents
 python eval/run_openrca_eval.py --mock       # no API key needed
 python eval/run_openrca_eval.py --n 5        # quick test with 5 incidents
 python eval/run_openrca_eval.py --bank-dir /path/to/Bank
@@ -88,9 +72,9 @@ python eval/run_openrca_eval.py --bank-dir /path/to/Bank
 
 ### Eval 3 — RCAEvals (RE3-OB code-level faults)
 
-Code-level faults injected into the Online Boutique microservices system. Each case includes metric time series, logs with stack traces, and a known injection time. The agent must identify the faulty service from code-level signals.
+Code-level faults injected into the Online Boutique microservices system from the [RCAEval benchmark](https://github.com/phamquiluan/RCAEval). Each case includes metric time series, logs with stack traces, and a known injection time.
 
-**Data download (prerequisite):**
+**Data setup:**
 
 ```bash
 git clone https://github.com/phamquiluan/RCAEval /tmp/RCAEval
@@ -100,27 +84,27 @@ cp -r data/RE3-OB <project_root>/data/RE3-OB
 ```
 
 ```bash
-python eval/run_rcaeval_eval.py              # all RE3-OB cases (requires API key)
+python eval/run_rcaeval_eval.py              # all RE3-OB cases
 python eval/run_rcaeval_eval.py --mock       # no API key needed
-python eval/run_rcaeval_eval.py --n 5        # quick sanity check with 5 cases
+python eval/run_rcaeval_eval.py --n 5        # quick sanity check
 python eval/run_rcaeval_eval.py --fault-types F1 F3
 python eval/run_rcaeval_eval.py --model claude-opus
 ```
 
 ---
 
-### End-to-End Demo — RE3-OB with Slack
+## Demo — End-to-End with Slack
 
-Runs a full end-to-end scenario: Slack alert fires → RootScout loads RE3-OB telemetry → causal graph is built → LLM identifies root cause → Slack RCA report is posted. Works in dry-run mode without a Slack token.
+Runs a full end-to-end scenario using RE3-OB telemetry: Slack alert fires → RootScout builds the causal graph → LLM identifies root cause → Slack RCA report is posted.
 
 **Prerequisite:** RE3-OB data downloaded (see Eval 3 above).
 
 ```bash
 # Dry-run (no Slack token needed):
-python demo_Rcaevals.py
+python demo/demo_Rcaevals.py
 
 # With real Slack:
-SLACK_BOT_TOKEN=xoxb-... SLACK_ALERT_CHANNEL=#incidents python demo_Rcaevals.py
+SLACK_BOT_TOKEN=xoxb-... SLACK_ALERT_CHANNEL=#incidents python demo/demo_Rcaevals.py
 ```
 
 ---

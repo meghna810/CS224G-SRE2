@@ -21,8 +21,8 @@ import json
 import time
 from datetime import datetime, timezone
 
-# Add paths for imports
-sys.path.append(os.path.dirname(__file__))
+# Add project root to path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from RootScout.otel_ingester import OTelIngester
 from RootScout.graph_sink import GraphBuilderSink, ComposedSink
