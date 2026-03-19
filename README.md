@@ -1,6 +1,8 @@
 # RootScout
 
-RootScout is an agentic system for automated root cause analysis (RCA) in distributed systems. It ingests telemetry (OTel traces, metrics, logs) and GitHub PR data, builds a causal dependency graph, and uses an LLM to identify which service caused an incident and why.
+RootScout is an AI on-call agent that diagnosis production incidents automatically. 
+
+Check us out at : [rootscout](https://cs-224-g-sre-2-mr8b.vercel.app)
 
 ---
 
