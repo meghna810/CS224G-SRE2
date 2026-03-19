@@ -13,7 +13,7 @@ import sys
 import os
 from datetime import datetime, timezone
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'Ingester'))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'Ingester'))
 
 from data_ingester import IngestConfig, GitHubIngester, ChangeSink
 from typing import Any, Dict, List

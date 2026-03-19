@@ -9,7 +9,7 @@ import json
 import time
 import asyncio
 
-sys.path.insert(0, os.path.dirname(__file__))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 PASS = "\033[32m PASS\033[0m"
 FAIL = "\033[31m FAIL\033[0m"
