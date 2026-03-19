@@ -184,7 +184,12 @@ def _load_windowed_wide_metrics(
     """
     path = os.path.join(case_dir, "data.csv")
     if not os.path.exists(path):
-        return pd.DataFrame()
+        # Fallback: some dataset versions use metrics.csv
+        alt = os.path.join(case_dir, "metrics.csv")
+        if os.path.exists(alt):
+            path = alt
+        else:
+            return pd.DataFrame()
 
     chunks = []
     for chunk in pd.read_csv(
@@ -221,17 +226,34 @@ def _load_windowed_logs(
         path, chunksize=chunk_size, low_memory=False,
         encoding="utf-8", encoding_errors="replace",
     ):
-        # Detect time column name (may be "time" or "timestamp")
-        time_col = "time" if "time" in chunk.columns else (
-            "timestamp" if "timestamp" in chunk.columns else None
-        )
+        # Detect the numeric Unix-seconds time column.
+        # Some datasets have:
+        #   "time"      — numeric Unix seconds
+        #   "timestamp" — numeric Unix nanoseconds (RCAEval RE3-OB format)
+        # When both exist, prefer "timestamp" if "time" is non-numeric (HH:MM strings).
+        time_col = None
+        ns_scale = 1.0  # multiplier to convert stored value → Unix seconds
+        if "timestamp" in chunk.columns:
+            sample = pd.to_numeric(chunk["timestamp"].iloc[:5], errors="coerce")
+            if sample.notna().any():
+                time_col = "timestamp"
+                # Nanoseconds if value > 1e12 (Unix ns since epoch >> Unix s since epoch)
+                if float(sample.dropna().iloc[0]) > 1e12:
+                    ns_scale = 1e-9
+        if time_col is None and "time" in chunk.columns:
+            sample = pd.to_numeric(chunk["time"].iloc[:5], errors="coerce")
+            if sample.notna().any():
+                time_col = "time"
         if time_col is None:
             break
-        filtered = chunk[(chunk[time_col] >= start_ts) & (chunk[time_col] <= end_ts)]
+
+        ts_numeric = pd.to_numeric(chunk[time_col], errors="coerce") * ns_scale
+        mask = (ts_numeric >= start_ts) & (ts_numeric <= end_ts)
+        filtered = chunk[mask].copy()
         if not filtered.empty:
-            # Normalise time column name
+            filtered["time"] = ts_numeric[mask].values
             if time_col != "time":
-                filtered = filtered.rename(columns={time_col: "time"})
+                filtered = filtered.drop(columns=[time_col], errors="ignore")
             chunks.append(filtered)
 
     if not chunks:
@@ -240,9 +262,12 @@ def _load_windowed_logs(
     df = pd.concat(chunks, ignore_index=True)
 
     # Cap per-service rows
-    svc_col = "service_name" if "service_name" in df.columns else (
-        df.columns[1] if len(df.columns) >= 2 else None
-    )
+    for _sc in ("service_name", "container_name", "cmdb_id"):
+        if _sc in df.columns:
+            svc_col = _sc
+            break
+    else:
+        svc_col = df.columns[1] if len(df.columns) >= 2 else None
     if svc_col:
         df = (
             df.groupby(svc_col, group_keys=False)
@@ -500,10 +525,13 @@ def build_re3_graph(
 
     # 6. Attach log events per service
     if not logs_df.empty:
-        # Detect service column name
-        svc_col = "service_name" if "service_name" in logs_df.columns else (
-            logs_df.columns[1] if len(logs_df.columns) >= 3 else None
-        )
+        # Detect service column name (handle multiple naming conventions)
+        for _sc in ("service_name", "container_name", "cmdb_id"):
+            if _sc in logs_df.columns:
+                svc_col = _sc
+                break
+        else:
+            svc_col = logs_df.columns[1] if len(logs_df.columns) >= 3 else None
         msg_col = "log_message" if "log_message" in logs_df.columns else (
             "message" if "message" in logs_df.columns else (
                 logs_df.columns[2] if len(logs_df.columns) >= 3 else None

@@ -1,0 +1,11 @@
+instruction,task_index,scoring_points
+Code fault injected into cartservice (fault type F1: incorrect parameter) at 2024-11-18 05:43:12 UTC. Alert expected at frontend (Online Boutique entry point).,task_3,"The only predicted root cause component is cartservice
+The only predicted root cause reason is incorrect parameter passed to function"
+Code fault injected into cartservice (fault type F1: incorrect parameter) at 2024-11-22 12:50:31 UTC. Alert expected at frontend (Online Boutique entry point).,task_3,"The only predicted root cause component is cartservice
+The only predicted root cause reason is incorrect parameter passed to function"
+Code fault injected into cartservice (fault type F1: incorrect parameter) at 2024-11-23 13:30:30 UTC. Alert expected at frontend (Online Boutique entry point).,task_3,"The only predicted root cause component is cartservice
+The only predicted root cause reason is incorrect parameter passed to function"
+Code fault injected into currencyservice (fault type F1: incorrect parameter) at 2024-11-18 06:08:55 UTC. Alert expected at frontend (Online Boutique entry point).,task_3,"The only predicted root cause component is currencyservice
+The only predicted root cause reason is incorrect parameter passed to function"
+Code fault injected into currencyservice (fault type F1: incorrect parameter) at 2024-11-22 13:16:15 UTC. Alert expected at frontend (Online Boutique entry point).,task_3,"The only predicted root cause component is currencyservice
+The only predicted root cause reason is incorrect parameter passed to function"

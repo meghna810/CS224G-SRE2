@@ -138,14 +138,31 @@ def _parse_case_dir_name(
         "checkoutservice_F3_12"   → ("checkoutservice", "F3", 12)
         "redis-cart_F2_3"         → ("redis-cart", "F2", 3)
     """
-    # Allow service names with hyphens; fault type is F1–F5
-    m = re.fullmatch(r"(.+?)_(F[1-5])_(\d+)", dir_name)
+    # Allow service names with hyphens; fault type is F1–F5 (case-insensitive)
+    m = re.fullmatch(r"(.+?)_(F[1-5])_(\d+)", dir_name, re.IGNORECASE)
     if m is None:
         return None
-    service   = m.group(1)
-    fault_type = m.group(2)
+    service    = m.group(1)
+    fault_type = m.group(2).upper()
     case_num   = int(m.group(3))
     return service, fault_type, case_num
+
+
+def _parse_nested_service_dir(
+    dir_name: str,
+) -> Optional[Tuple[str, str]]:
+    """
+    Parse "{service}_f{n}" → (service, fault_type) for the nested dataset layout
+    where case numbers are sub-directories.
+
+    Examples:
+        "cartservice_f1"  → ("cartservice", "F1")
+        "emailservice_f3" → ("emailservice", "F3")
+    """
+    m = re.fullmatch(r"(.+?)_f([1-5])", dir_name, re.IGNORECASE)
+    if m is None:
+        return None
+    return m.group(1), f"F{m.group(2)}"
 
 
 def _read_inject_time(case_dir: str) -> Optional[datetime]:
@@ -223,27 +240,46 @@ def load_re3_scenarios(
         )
         return []
 
-    # Discover and parse case directories
+    # Discover and parse case directories.
+    # Two supported layouts:
+    #   Flat:   data_dir/{service}_{F1}_{case_num}/   (e.g. cartservice_F1_1/)
+    #   Nested: data_dir/{service}_f{n}/{case_num}/   (e.g. cartservice_f1/1/)
     parsed: List[Tuple[str, str, int, str]] = []   # (service, fault_type, case_num, abs_path)
     for entry in os.listdir(data_dir):
         abs_path = os.path.join(data_dir, entry)
         if not os.path.isdir(abs_path):
             continue
-        result = _parse_case_dir_name(entry)
-        if result is None:
-            continue
-        service, fault_type, case_num = result
 
-        # Apply fault_types filter
-        if fault_types is not None and fault_type not in fault_types:
+        flat_result = _parse_case_dir_name(entry)
+        if flat_result is not None:
+            # Flat layout — case dir is abs_path itself
+            service, fault_type, case_num = flat_result
+            if fault_types is not None and fault_type not in fault_types:
+                continue
+            if _read_inject_time(abs_path) is None:
+                print(f"[re3_loader] Skipping {entry}: inject_time.txt missing or unreadable")
+                continue
+            parsed.append((service, fault_type, case_num, abs_path))
             continue
 
-        # Must have inject_time.txt
-        if _read_inject_time(abs_path) is None:
-            print(f"[re3_loader] Skipping {entry}: inject_time.txt missing or unreadable")
-            continue
-
-        parsed.append((service, fault_type, case_num, abs_path))
+        nested_result = _parse_nested_service_dir(entry)
+        if nested_result is not None:
+            # Nested layout — numeric subdirs are the case numbers
+            service, fault_type = nested_result
+            if fault_types is not None and fault_type not in fault_types:
+                continue
+            for sub in sorted(os.listdir(abs_path)):
+                sub_path = os.path.join(abs_path, sub)
+                if not os.path.isdir(sub_path):
+                    continue
+                try:
+                    case_num = int(sub)
+                except ValueError:
+                    continue
+                if _read_inject_time(sub_path) is None:
+                    print(f"[re3_loader] Skipping {entry}/{sub}: inject_time.txt missing or unreadable")
+                    continue
+                parsed.append((service, fault_type, case_num, sub_path))
 
     if not parsed:
         print(f"[re3_loader] No valid RE3-OB cases found in {data_dir}")
