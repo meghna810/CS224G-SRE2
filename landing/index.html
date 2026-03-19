@@ -1254,34 +1254,45 @@
     scored across three independent axes.
   </p>
 
-  <div class="eval-grid">
-    <div class="eval-card">
-      <h3>Synthetic Benchmark</h3>
-      <div class="eval-score high">~80%</div>
-      <p class="eval-desc">10 hand-crafted scenarios with known root causes, tested on controlled service topologies.</p>
-      <div class="progress-bar"><div class="progress-fill" style="width: 80%"></div></div>
-      <div class="progress-label"><span>Component match</span><span>80%</span></div>
-      <div class="progress-bar"><div class="progress-fill" style="width: 75%"></div></div>
-      <div class="progress-label"><span>Reason similarity (cosine &ge; 0.5)</span><span>75%</span></div>
-    </div>
-    <div class="eval-card">
-      <h3>Scoring Criteria</h3>
-      <p class="eval-desc" style="margin-bottom: 1.25rem;">Each generated report is scored on three independent axes:</p>
-      <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem;">
-        <li style="font-size: 0.875rem; color: var(--text-muted);">
-          <strong style="color: var(--text); display: block; margin-bottom: 0.15rem;">Component match</strong>
-          Exact identification of the root cause service
-        </li>
-        <li style="font-size: 0.875rem; color: var(--text-muted);">
-          <strong style="color: var(--text); display: block; margin-bottom: 0.15rem;">Reason similarity</strong>
-          Cosine similarity &ge; 0.50 against ground-truth explanations
-        </li>
-        <li style="font-size: 0.875rem; color: var(--text-muted);">
-          <strong style="color: var(--text); display: block; margin-bottom: 0.15rem;">Timestamp accuracy</strong>
-          Incident onset within &plusmn;60 seconds of ground truth
-        </li>
-      </ul>
-    </div>
+  <div style="overflow-x: auto; margin-top: 3rem;">
+    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+      <thead>
+        <tr>
+          <th style="background: #2d5a27; color: #fff; font-weight: 700; padding: 1rem 1.25rem; text-align: left; border: 1px solid #3d7a35;">Dataset</th>
+          <th style="background: #2d5a27; color: #fff; font-weight: 700; padding: 1rem 1.25rem; text-align: left; border: 1px solid #3d7a35;">Strengths</th>
+          <th style="background: #2d5a27; color: #fff; font-weight: 700; padding: 1rem 1.25rem; text-align: left; border: 1px solid #3d7a35;">Limitations</th>
+          <th style="background: #2d5a27; color: #fff; font-weight: 700; padding: 1rem 1.25rem; text-align: left; border: 1px solid #3d7a35;">Best Model</th>
+          <th style="background: #2d5a27; color: #fff; font-weight: 700; padding: 1rem 1.25rem; text-align: left; border: 1px solid #3d7a35; text-decoration: underline; text-underline-offset: 3px;">Component match score</th>
+          <th style="background: #2d5a27; color: #fff; font-weight: 700; padding: 1rem 1.25rem; text-align: left; border: 1px solid #3d7a35;">RCA cosine similarity score</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="background: #c8cfc4;">
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">OpenRCA Microsoft</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Emulates real life production incidents</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Missing codebase</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Claude Opus 4.6</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">45%</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">18%</td>
+        </tr>
+        <tr style="background: #d8dfd4;">
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">RCAEvals</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Has telemetry+ codebase present, deeper analysis for RCA</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Doesn't emulate real-life incidents well</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Claude Opus 4.6</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">56%</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">28%</td>
+        </tr>
+        <tr style="background: #c8cfc4;">
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Synthetic data</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Easy to generate, test different scenarios</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Doesn't emulate real-life incidents that well</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">Claude Opus 4.6</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">100%</td>
+          <td style="padding: 1rem 1.25rem; border: 1px solid #aab8a4; color: #1a1a1a; vertical-align: top;">91%</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
 </section>
